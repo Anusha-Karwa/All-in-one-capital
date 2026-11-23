@@ -8,6 +8,8 @@ describe("public paths", () => {
     ["/privacy", "GET", true],
     ["/api/applications", "POST", true],
     ["/api/health", "GET", true],
+    ["/api/uploads", "POST", true],
+    ["/api/uploads", "GET", false],
     ["/", "GET", false],
     ["/memos", "GET", false],
     ["/api/applications", "GET", false],

@@ -30,7 +30,7 @@ Built ahead of their phases because they need no API keys. Each is unit-tested; 
 | Consistency checker | §3.2 | `src/research/consistency.ts`: value mismatch, gross/net & paying/registered/trial/target definitions, unquantified claims, text diffs (unjudged), severities per kill criterion 11 | Claim extraction (Phase 4, keys) to feed it; LLM judge for text diffs |
 | PII | §5, §9.4 | AES-256-GCM `founders_pii`, keyed hashes, background masking + `pii_in_text` flag | `PII_ENCRYPTION_KEY` |
 | Lifecycle | §4 | Transition whitelist, human-only statuses, stuck reconciler (`npm run reconcile`) | Inngest cron |
-| Intake | §9.5, §11, §12 | `POST /api/applications` (Zod, consent, honeypot, 5/min limit, PDF checks, idempotency incl. concurrent duplicates), `/apply`, `/apply/thanks`, `/privacy` (draft), Inbox table, document parsing, `npm run seed:apps` | Blob token, Inngest keys, seed PDFs; Vercel body limit (D-027) |
+| Intake | §9.5, §11, §12 | Direct-to-Blob uploads via `POST /api/uploads` (D-033) + `POST /api/applications` (Zod, consent, honeypot, 5/min limit, PDF checks, idempotency incl. concurrent duplicates), `/apply`, `/apply/thanks`, `/privacy` (draft), Inbox table, document parsing, `npm run seed:apps` | Blob token, Inngest keys, seed PDFs. Vercel body limit fixed (D-033); a real-Blob round trip needs the token |
 | Scheduling rules | §8.3, R11 | Tue/Thu 14–18 IST slots, 2-business-day / 14-day window, busy/rejected exclusion, Aditya iff deeptech, 48h follow-up/escalate, counter-proposal cap | LangGraph + Google (Phase 8) |
 | Retry table | §8.4 | `src/agent/retryPolicy.ts` + `runWithPolicy` | Tools (Phase 8) |
 | Evals | §10.1 | `evals/KILL_CRITERIA.md` (what enforces each today), `evals/fixtures/applicant_expectations.json` (§3.2, `riya_confirmed: false`), guard tests keeping fixtures out of `src/` and prompts | Phase 9 harness |
@@ -39,3 +39,6 @@ Built ahead of their phases because they need no API keys. Each is unit-tested; 
 Verified live (production build, local DB): submit → 201 `APP-2026-0001`; duplicate → same ref; missing consent → 400; honeypot → 202 dropped; 6th request/min → 429; inbox lists it; in `APP_ENV=prod` internal pages → 503 while `/apply` stays up.
 
 Tests: 169 passing + 4 todo.
+
+### Upload size fix (D-033) ✅
+Browser uploads PDFs straight to private Vercel Blob; the API receives only references. Verified: unit tests (path rules, token constraints, Vercel `handleUpload` issuing/refusing tokens offline, server re-validation, cleanup, honeypot, rate limit, multipart fallback) and a headless-Chromium run of `/apply` against a production build (token 200 → Blob PUT with client token → 487-byte JSON submit → thanks page). Not yet verified: a round trip against a real Blob store (needs `BLOB_READ_WRITE_TOKEN`).

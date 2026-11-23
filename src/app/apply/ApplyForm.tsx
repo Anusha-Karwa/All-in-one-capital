@@ -1,9 +1,12 @@
 "use client";
 
+import { upload } from "@vercel/blob/client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { FILE_LIMITS as MAX_BYTES } from "@/intake/schema";
+import { incomingPathFor } from "@/intake/uploads";
 
 const SECTORS = [
   ["fintech", "Fintech"],
@@ -30,11 +33,18 @@ type Founder = {
 };
 const blankFounder = (): Founder => ({ fullName: "", email: "", phone: "", linkedinUrl: "", role: "", background: "" });
 
+const KINDS = ["deck", "form"] as const;
+
 const field = "flex flex-col gap-1 text-sm";
 const select = "h-9 rounded-md border bg-background px-3 text-sm";
 
-export function ApplyForm() {
+/**
+ * `directUpload` (prod, Blob configured): PDFs go browser → private Vercel Blob, then a small JSON submit —
+ * this avoids the serverless request-size limit. Otherwise (local dev): one multipart POST.
+ */
+export function ApplyForm({ directUpload }: { directUpload: boolean }) {
   const router = useRouter();
+  const [progress, setProgress] = useState<string | null>(null);
   const [founders, setFounders] = useState<Founder[]>([blankFounder()]);
   const [errors, setErrors] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
@@ -59,15 +69,42 @@ export function ApplyForm() {
       founders,
       consent: f.get("consent") === "on",
     };
-    const body = new FormData();
-    body.set("payload", JSON.stringify(payload));
-    body.set("fax", String(f.get("fax") ?? ""));
-    for (const k of ["deck", "form"]) {
-      const file = f.get(k);
-      if (file instanceof File && file.size) body.set(k, file);
+    const picked = KINDS.map((kind) => ({ kind, file: f.get(kind) })).filter(
+      (x): x is { kind: (typeof KINDS)[number]; file: File } => x.file instanceof File && x.file.size > 0,
+    );
+    const tooBig = picked.filter((p) => p.file.size > MAX_BYTES[p.kind]);
+    if (tooBig.length) {
+      setErrors(tooBig.map((p) => `${p.file.name}: larger than ${MAX_BYTES[p.kind] / 1024 / 1024} MB`));
+      setBusy(false);
+      return;
     }
     try {
-      const res = await fetch("/api/applications", { method: "POST", body });
+      let res: Response;
+      if (directUpload) {
+        const files = [];
+        for (const p of picked) {
+          const blob = await upload(incomingPathFor(p.kind, p.file.name), p.file, {
+            access: "private",
+            handleUploadUrl: "/api/uploads",
+            contentType: "application/pdf",
+            multipart: p.file.size > 5 * 1024 * 1024,
+            onUploadProgress: ({ percentage }) => setProgress(`Uploading ${p.kind}… ${Math.round(percentage)}%`),
+          });
+          files.push({ kind: p.kind, pathname: blob.pathname, filename: p.file.name });
+        }
+        setProgress("Submitting…");
+        res = await fetch("/api/applications", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ payload, files, fax: String(f.get("fax") ?? "") }),
+        });
+      } else {
+        const body = new FormData();
+        body.set("payload", JSON.stringify(payload));
+        body.set("fax", String(f.get("fax") ?? ""));
+        for (const p of picked) body.set(p.kind, p.file);
+        res = await fetch("/api/applications", { method: "POST", body });
+      }
       const json = await res.json();
       if (res.ok && json.publicRef) router.push(`/apply/thanks?ref=${encodeURIComponent(json.publicRef)}`);
       else if (res.ok) router.push("/apply/thanks");
@@ -75,10 +112,13 @@ export function ApplyForm() {
         setErrors(
           json.issues?.map((i: { path: string; message: string }) => `${i.path}: ${i.message}`) ?? [json.error],
         );
-    } catch {
-      setErrors(["Network error — please try again."]);
+    } catch (err) {
+      setErrors([
+        err instanceof Error && err.message ? `Upload failed: ${err.message}` : "Network error — please try again.",
+      ]);
     } finally {
       setBusy(false);
+      setProgress(null);
     }
   }
 
@@ -255,7 +295,7 @@ export function ApplyForm() {
         </ul>
       )}
       <Button type="submit" disabled={busy}>
-        {busy ? "Submitting…" : "Submit application"}
+        {busy ? (progress ?? "Submitting…") : "Submit application"}
       </Button>
     </form>
   );
