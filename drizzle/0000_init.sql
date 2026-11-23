@@ -288,7 +288,7 @@ CREATE TABLE "llm_calls" (
 	"cached_tokens" integer DEFAULT 0 NOT NULL,
 	"latency_ms" integer,
 	"cost_inr" numeric(14, 4) DEFAULT '0' NOT NULL,
-	"cost_usd" numeric(14, 4) DEFAULT '0' NOT NULL,
+	"cost_usd" numeric(18, 8) DEFAULT '0' NOT NULL,
 	"status" "llm_call_status" NOT NULL,
 	"error_type" text,
 	"retry_count" integer DEFAULT 0 NOT NULL,

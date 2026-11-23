@@ -43,3 +43,6 @@ next-env.d.ts
 
 # case material stays local (imported into the DB by scripts, never committed)
 seed/**/*.pdf
+
+# local embedded postgres
+.pglite

@@ -639,7 +639,8 @@ export const llmCalls = pgTable(
     cachedTokens: integer("cached_tokens").notNull().default(0),
     latencyMs: integer("latency_ms"),
     costInr: money("cost_inr").notNull().default("0"),
-    costUsd: money("cost_usd").notNull().default("0"),
+    // 8 dp: a single embedding call can cost ~$0.00002, which 4 dp would round to zero (DECISIONS D-012)
+    costUsd: numeric("cost_usd", { precision: 18, scale: 8 }).notNull().default("0"),
     status: llmCallStatus("status").notNull(),
     errorType: text("error_type"),
     retryCount: integer("retry_count").notNull().default(0),
