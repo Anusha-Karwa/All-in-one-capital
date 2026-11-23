@@ -60,6 +60,9 @@ export async function buildHealthReport(e: Env, probes: { db?: Probe }): Promise
     calendar: presence(e, ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"], "Phase 8"),
   };
   // Overall ok = nothing is in error. Unconfigured integrations are expected during the phased build.
-  const ok = Object.values(checks).every((c) => c.status !== "error");
+  // In prod the database must be reachable, not merely "not configured".
+  const ok =
+    Object.values(checks).every((c) => c.status !== "error") &&
+    (e.APP_ENV !== "prod" || checks.database.status === "ok");
   return { ok, appEnv: e.APP_ENV, testMode: e.TEST_MODE, checks, checkedAt: new Date().toISOString() };
 }

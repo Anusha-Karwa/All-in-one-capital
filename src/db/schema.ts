@@ -14,6 +14,7 @@ import {
   jsonb,
   numeric,
   pgEnum,
+  pgSequence,
   pgTable,
   real,
   serial,
@@ -760,4 +761,21 @@ export const auditLog = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index("audit_log_created_at_idx").on(t.createdAt)],
+);
+
+// ─────────────────────────────────────────── intake helpers (migration 0001)
+
+/** APP-<year>-<nnnn> public refs and F-<nnnn> founder ids come from sequences (safe under concurrent intake). */
+export const applicationRefSeq = pgSequence("application_ref_seq", { startWith: 1 });
+export const founderIdSeq = pgSequence("founder_id_seq", { startWith: 1001 });
+
+/** Fixed-window rate limiter (used when Upstash isn't configured). key = route + keyed hash of IP. */
+export const rateLimits = pgTable(
+  "rate_limits",
+  {
+    key: varchar("key", { length: 128 }).notNull(),
+    windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+    count: integer("count").notNull().default(0),
+  },
+  (t) => [uniqueIndex("rate_limits_key_window_uq").on(t.key, t.windowStart)],
 );

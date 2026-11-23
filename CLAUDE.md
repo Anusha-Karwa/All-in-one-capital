@@ -18,6 +18,7 @@ src/scoring      retrieval, scoring, citation validator
 src/agent        LangGraph scheduling agent, tools/*, retryPolicy.ts
 src/integrations gmail, calendar, blob
 src/inngest      functions
+src/intake       form schema, submit (idempotency, PII split), storage, rate limit, status machine, reconciler, doc parsing
 src/knowledge    PDF extraction, memo/notes parsers, rules R1–R14, importer, KB queries
 src/components   shadcn/ui (ui/*) + shared components
 src/lib          logger, utils, health, pageData
@@ -32,6 +33,7 @@ seed/            case PDFs (git-ignored)
 - `npm run dev` · `npm run build`
 - `npm run typecheck` · `npm run lint` · `npm test`
 - `npm run kb:import` (memos+notes+rules from /seed; `-- --no-embed` to skip embeddings) · `npm run prices:set -- <model> <in> <out>` · `npm run prompts:sync`
+- `npm run seed:apps` (10 seed applications; `-- --test --suffix=-x` for is_test copies) · `npm run reconcile` (stuck-job sweep)
 - Local DB without Neon: `DATABASE_URL_DEV=pglite://./.pglite` (migrations auto-applied by scripts)
 - `npm run db:generate` (after editing schema.ts) · `npm run db:verify` (apply migrations to in-memory PG+pgvector) · `npm run db:migrate` (dev branch) · `npm run db:migrate:prod` (prod — explicit only)
 
@@ -55,4 +57,5 @@ seed/            case PDFs (git-ignored)
 - Never point tests or dev at the prod database.
 - Never let spending continue after the daily limit (wrapper checks before every call).
 - Never call a model without a model_prices row; never import provider SDKs outside src/ai.
+- Never change application status except through the transition whitelist (src/intake/status.ts); human-only statuses stay human-only.
 - Never attach a citation the code didn't find in the source (rules stay "unverified" otherwise).

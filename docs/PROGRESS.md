@@ -20,3 +20,22 @@ Still open: migrations not applied to Neon (no `DATABASE_URL[_DEV]` yet).
 - `/api/health` reports Portkey/Langfuse as `configured_unprobed` once keys exist; a live probe comes with the first real call.
 
 **Next (Phase 2)**: fund research job (needs grounding — Phase 1 keys), stated thesis v1, revealed thesis v1 from memos, `/thesis`, `/portfolio`.
+
+## Pulled forward (pure code, no keys) ✅
+Built ahead of their phases because they need no API keys. Each is unit-tested; none has run on the real seed files yet.
+
+| Area | Spec | What exists | Waiting on |
+|---|---|---|---|
+| Arithmetic checker | §7.5 | `src/research/numericChecks.ts`: Indian units, product/quotient/sum, formula vs cross-check thresholds; all §3.2 cases that have numbers (EarnWise, GrainKind, Settlr flagged; CAPilot, RentRoute, Yatrika, Talkbook-teams not) | 4 `it.todo` rows need deck figures (Pumpwise, StockSathi, CareCorner, Talkbook TAM) |
+| Consistency checker | §3.2 | `src/research/consistency.ts`: value mismatch, gross/net & paying/registered/trial/target definitions, unquantified claims, text diffs (unjudged), severities per kill criterion 11 | Claim extraction (Phase 4, keys) to feed it; LLM judge for text diffs |
+| PII | §5, §9.4 | AES-256-GCM `founders_pii`, keyed hashes, background masking + `pii_in_text` flag | `PII_ENCRYPTION_KEY` |
+| Lifecycle | §4 | Transition whitelist, human-only statuses, stuck reconciler (`npm run reconcile`) | Inngest cron |
+| Intake | §9.5, §11, §12 | `POST /api/applications` (Zod, consent, honeypot, 5/min limit, PDF checks, idempotency incl. concurrent duplicates), `/apply`, `/apply/thanks`, `/privacy` (draft), Inbox table, document parsing, `npm run seed:apps` | Blob token, Inngest keys, seed PDFs; Vercel body limit (D-027) |
+| Scheduling rules | §8.3, R11 | Tue/Thu 14–18 IST slots, 2-business-day / 14-day window, busy/rejected exclusion, Aditya iff deeptech, 48h follow-up/escalate, counter-proposal cap | LangGraph + Google (Phase 8) |
+| Retry table | §8.4 | `src/agent/retryPolicy.ts` + `runWithPolicy` | Tools (Phase 8) |
+| Evals | §10.1 | `evals/KILL_CRITERIA.md` (what enforces each today), `evals/fixtures/applicant_expectations.json` (§3.2, `riya_confirmed: false`), guard tests keeping fixtures out of `src/` and prompts | Phase 9 harness |
+| Prod safety | — | Middleware blocks internal pages in prod until auth; health fails in prod without DB | Auth (Phase 8) |
+
+Verified live (production build, local DB): submit → 201 `APP-2026-0001`; duplicate → same ref; missing consent → 400; honeypot → 202 dropped; 6th request/min → 429; inbox lists it; in `APP_ENV=prod` internal pages → 503 while `/apply` stays up.
+
+Tests: 169 passing + 4 todo.

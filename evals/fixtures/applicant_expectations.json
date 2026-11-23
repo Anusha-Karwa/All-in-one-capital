@@ -1,0 +1,119 @@
+{
+  "_meta": {
+    "source": "BUILD_SPEC §3.2 (decks read in full and checked against forms; arithmetic recomputed with 1 Cr = 1e7, 1 L = 1e5)",
+    "status": "draft — each item counts as ground truth only once riya_confirmed = true",
+    "severity_scale": ["critical", "high", "low"]
+  },
+  "applicants": [
+    {
+      "company": "EarnWise", "sector_claimed": "fintech", "sector_expected": "fintech (earned wage access)", "stage": "pre_seed", "source": "form",
+      "contradictions": [
+        { "field": "founder_credentials", "severity": "critical", "deck": "Ex-Goldman Sachs. Ex-Google. MBA, IIM Ahmedabad", "form": "10-week IB summer internship; 5-month vendor contract at a large tech co; tier-2 MBA" },
+        { "field": "team_size", "severity": "low", "deck": "Team of 12", "form": "team of 5 (2 outsourced devs)" },
+        { "field": "paying_customers_count", "severity": "high", "deck": "3 enterprise clients live", "form": "1 client live + 2 pilots" },
+        { "field": "tech_leadership", "severity": "high", "deck": "tech led by an advisor", "form": "solo founder; co-founder left Jul 2026" }
+      ],
+      "arithmetic": [{ "label": "TAM", "factors": ["10M", "₹12,000", "12"], "computed": "₹1,44,000 Cr", "stated": "₹14,400 Cr", "expect": "deck_arithmetic_error" }],
+      "flags": [{ "type": "contradiction", "severity": "critical", "why": "credential inflation → integrity flag" }],
+      "signals": ["solo founder", "advances funded by NBFC 'agreement in principle' and founder's savings → owns-risk question (R6, CampusCredit pattern)"],
+      "riya_confirmed": false
+    },
+    {
+      "company": "StockSathi", "sector_claimed": "consumer_tech", "sector_expected": "B2B commerce + credit", "stage": "pre_seed", "source": "warm_intro", "source_detail_expected": "warm intro via a Fund I founder",
+      "contradictions": [
+        { "field": "paying_customers_count", "severity": "high", "deck": "38 retailers", "form": "42 retailers" },
+        { "field": "credit_source", "severity": "critical", "deck": "funded from our own capital for now… NBFC partnership in discussion", "form": "Credit is provided through our NBFC partner. We take the first-loss risk." },
+        { "field": "cac", "severity": "high", "deck": "Oct CAC ₹2,860; 'CAC under ₹2,000' is the 12-month target", "form": "Our CAC is under ₹2,000" },
+        { "field": "location", "severity": "low", "deck": "interviews in Karimnagar + Warangal", "form": "Live in Karimnagar only" }
+      ],
+      "arithmetic": [{ "label": "market sizing", "expect": "ok", "note": "recomputes correctly (figures to be taken from the deck)" }],
+      "flags": [{ "type": "contradiction", "severity": "critical", "why": "source of credit capital" }, { "type": "regulatory_dependency", "severity": "high", "why": "first-loss + 'Not registered as an NBFC'" }],
+      "signals": ["60 owner interviews = field groundwork (SuperK / Jai Kisan pattern)", "CAC sample is 14 stores in one town (self-declared)"],
+      "riya_confirmed": false
+    },
+    {
+      "company": "CAPilot", "sector_claimed": "fintech", "sector_expected": "fintech (CA-firm SaaS)", "stage": "pre_seed", "source": "form",
+      "contradictions": [{ "field": "paying_customers_count", "severity": "high", "deck": "31 paying CA firms", "form": "24 paying + 7 on free trial, 2 churned" }],
+      "arithmetic": [{ "label": "ARR = MRR × 12", "factors": ["₹78k", "12"], "computed": "₹9.36 L", "expect": "ok" }],
+      "flags": [],
+      "signals": ["founder-market fit: practising CA", "CAC 'not measured yet' → missing-number penalty (R1)", "market top-down only ('1% of ₹1.4 lakh Cr')", "MRR 18k→41k→78k in 2 months — verify", "liability pushed to the CA"],
+      "riya_confirmed": false
+    },
+    {
+      "company": "Talkbook", "sector_claimed": "consumer_tech", "sector_expected": "B2B SaaS", "stage": "pre_seed", "source": "form",
+      "contradictions": [{ "field": "revenue_or_mrr", "severity": "high", "deck": "MRR ₹2.1 L", "form": "MRR ₹1.9 L" }],
+      "arithmetic": [
+        { "label": "MRR = seats × price", "factors": ["340", "₹500"], "computed": "₹1.7 L", "stated": "₹2.1 L", "expect": "metric_inconsistency" },
+        { "label": "MRR = teams × price", "factors": ["16", "₹13,000"], "computed": "₹2.08 L", "stated": "₹2.1 L", "expect": "ok" },
+        { "label": "TAM/SAM/SOM", "expect": "ok" }
+      ],
+      "flags": [{ "type": "portfolio_conflict", "severity": "critical", "why": "AI call summaries; deck lists meeting note-takers as competitors → overlaps MeetRecord (Meeting 4) → HOLD" }, { "type": "sector_outside", "severity": "low", "why": "label mismatch: B2B SaaS labelled consumer" }],
+      "signals": [],
+      "riya_confirmed": false
+    },
+    {
+      "company": "RentRoute", "sector_claimed": "fintech", "sector_expected": "fintech", "stage": "pre_seed", "source": "form",
+      "contradictions": [
+        { "field": "revenue_or_mrr", "severity": "high", "kind": "metric_definition", "deck": "₹11 L revenue (1.8% fee) — gross", "form": "net revenue ₹5.5 L after 0.9% to the payment partner" },
+        { "field": "users_count", "severity": "high", "kind": "metric_definition", "deck": "1,900 users", "form": "1,900 registered, 1,100 paid" }
+      ],
+      "arithmetic": [{ "label": "Revenue = volume × take rate", "factors": ["₹6.1 Cr", "1.8%"], "computed": "₹10.98 L", "stated": "₹11 L", "expect": "ok" }],
+      "flags": [{ "type": "regulatory_dependency", "severity": "high", "why": "single payment-aggregator dependency; card networks/banks have changed rent-payment rules before (Coinlane pattern, R8)" }],
+      "signals": ["'no direct competitors' — web research should test it", "cost per paying user unmeasured → penalty", "contract developers only"],
+      "riya_confirmed": false
+    },
+    {
+      "company": "GrainKind", "sector_claimed": "consumer_brand", "sector_expected": "consumer brand", "stage": "pre_seed", "source": "form",
+      "contradictions": [],
+      "arithmetic": [
+        { "label": "TAM", "factors": ["38M", "₹2,400"], "computed": "₹9,120 Cr", "stated": "₹91,200 Cr", "expect": "deck_arithmetic_error" },
+        { "label": "SAM", "factors": ["6M", "₹2,400"], "computed": "₹1,440 Cr", "stated": "₹14,400 Cr", "expect": "deck_arithmetic_error" },
+        { "label": "SOM", "stated": "₹28.8 Cr", "expect": "ok" }
+      ],
+      "flags": [],
+      "signals": ["strongest unit economics: 90-day repeat 31→34→38% by cohort, GM 48%, CAC by channel, LTV/CAC 1.8× (Giva pattern, R9)", "risks: single co-packer, rising paid social", "arithmetic check must not be reserved for weak decks"],
+      "riya_confirmed": false
+    },
+    {
+      "company": "Pumpwise", "sector_claimed": "deeptech", "sector_expected": "deeptech", "stage": "pre_seed", "source": "form + incubator mentor",
+      "contradictions": [],
+      "arithmetic": [{ "label": "TAM/SAM/SOM", "expect": "ok", "note": "recompute ✓ but assume 60 sensors/customer vs actual average 23" }],
+      "flags": [],
+      "signals": ["near path to revenue (Unbox pattern): 11 pilots → 6 paid", "downtime savings customer-reported, unaudited (they say so)", "revenue mostly hardware (₹13.3 L of ₹14.2 L)"],
+      "scheduling": { "aditya_joins": true, "second_call_by_partners": true },
+      "riya_confirmed": false
+    },
+    {
+      "company": "Settlr", "sector_claimed": "fintech", "sector_expected": "fintech", "stage": "series_a", "source": "form", "raise": "₹30 Cr at ₹180 Cr post",
+      "contradictions": [],
+      "arithmetic": [
+        { "label": "TAM", "factors": ["2.1M", "₹4.5 Cr"], "computed": "₹94.5 lakh Cr", "stated": "₹9.4 lakh Cr", "expect": "deck_arithmetic_error" },
+        { "label": "SAM", "expect": "deck_arithmetic_error", "note": "10× understated (figures from deck)" },
+        { "label": "SOM", "factors": ["15,000", "₹4.5 Cr"], "computed": "₹67,500 Cr", "stated": "₹6,750 Cr", "expect": "deck_arithmetic_error" }
+      ],
+      "flags": [{ "type": "stage_mismatch", "severity": "high", "why": "Series A raise for a pre-seed fund — must not be auto-rejected; recommendation explains the mismatch" }],
+      "signals": ["market sizes are payment volume, not revenue"],
+      "riya_confirmed": false
+    },
+    {
+      "company": "CareCorner", "sector_claimed": "other", "sector_expected": "healthcare", "stage": "pre_seed", "source": "form",
+      "contradictions": [],
+      "arithmetic": [{ "label": "market sizing", "expect": "ok" }],
+      "flags": [{ "type": "sector_outside", "severity": "high", "why": "healthcare is outside the four stated sectors — scored and flagged, never auto-rejected" }, { "type": "capital_structure", "severity": "high", "why": "capex ₹28 L per clinic; raising to open 5 more (HopBox pattern, R7)" }],
+      "signals": ["real traction: first clinic breakeven in month 8"],
+      "riya_confirmed": false
+    },
+    {
+      "company": "Yatrika", "sector_claimed": "consumer_tech", "sector_expected": "consumer tech", "stage": "pre_seed", "source": "form",
+      "contradictions": [
+        { "field": "customers_count", "severity": "high", "kind": "unquantified", "deck": "thousands of travellers", "form": "~1,300 travellers, 410 bookings" },
+        { "field": "growth_trend", "severity": "high", "kind": "unquantified", "deck": "3x growth; many 5-star reviews; growing across India", "form": "(numbers only in form)" },
+        { "field": "amount_raising", "severity": "low", "deck": "(no raise amount)", "form": "₹1.2 Cr" }
+      ],
+      "arithmetic": [{ "label": "Revenue = GMV × take", "factors": ["₹38.6 L", "12%"], "computed": "₹4.63 L", "stated": "₹4.6 L", "expect": "ok" }],
+      "flags": [],
+      "signals": ["unquantified deck claims → 'unverified', must not raise the score", "manual WhatsApp ops", "14% repeat", "CAC ₹640/booking", "slides out of order"],
+      "riya_confirmed": false
+    }
+  ]
+}

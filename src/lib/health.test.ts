@@ -11,6 +11,11 @@ describe("health report", () => {
     expect(r.testMode).toBe(true);
   });
 
+  it("in prod, a missing database makes the report unhealthy", async () => {
+    const r = await buildHealthReport(parseEnv({ APP_ENV: "prod" }), {});
+    expect(r.ok).toBe(false);
+  });
+
   it("marks the DB ok when the probe succeeds", async () => {
     const r = await buildHealthReport(parseEnv({ APP_ENV: "test", DATABASE_URL_DEV: "postgres://x" }), {
       db: async () => {},

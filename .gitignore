@@ -46,3 +46,6 @@ seed/**/*.pdf
 
 # local embedded postgres
 .pglite
+
+# local uploads (dev without Blob)
+.uploads
