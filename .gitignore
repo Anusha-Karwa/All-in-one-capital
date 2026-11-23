@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+!.env.example
+
+# case material stays local (imported into the DB by scripts, never committed)
+seed/**/*.pdf
