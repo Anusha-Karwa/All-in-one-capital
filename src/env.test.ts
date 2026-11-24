@@ -38,6 +38,13 @@ describe("env", () => {
     }
   });
 
+  it("Vercel production is always prod, even if APP_ENV is missing or says dev", () => {
+    expect(parseEnv({ VERCEL_ENV: "production" }).APP_ENV).toBe("prod");
+    expect(parseEnv({ VERCEL_ENV: "production", APP_ENV: "dev" }).APP_ENV).toBe("prod");
+    expect(parseEnv({ VERCEL_ENV: "preview" }).APP_ENV).toBe("dev");
+    expect(parseEnv({ VERCEL_ENV: "preview", APP_ENV: "test" }).APP_ENV).toBe("test");
+  });
+
   it("never routes non-prod processes to the prod database", () => {
     const vars = { DATABASE_URL: "postgres://prod", DATABASE_URL_DEV: "postgres://dev" };
     expect(databaseUrl(parseEnv({ ...vars, APP_ENV: "test" }))).toBe("postgres://dev");

@@ -42,3 +42,8 @@ Tests: 169 passing + 4 todo.
 
 ### Upload size fix (D-033) ✅
 Browser uploads PDFs straight to private Vercel Blob; the API receives only references. Verified: unit tests (path rules, token constraints, Vercel `handleUpload` issuing/refusing tokens offline, server re-validation, cleanup, honeypot, rate limit, multipart fallback) and a headless-Chromium run of `/apply` against a production build (token 200 → Blob PUT with client token → 487-byte JSON submit → thanks page). Not yet verified: a round trip against a real Blob store (needs `BLOB_READ_WRITE_TOKEN`).
+
+## Deployment (early, partial)
+- Vercel project `all_in_one_capital` is connected to GitHub `main`; production at https://allinonecapital.vercel.app (preview URLs behind Vercel Authentication).
+- Vercel env: `APP_ENV=prod` (production) / `dev` (preview, development). No other variables yet → intake returns "not configured", staff pages 503 by design, `/api/health` 503 until a database is set.
+- Still to do for Phase 11: Neon URLs per environment, all keys, Inngest integration, OAuth redirect URIs, smoke + volume tests, RUNBOOK.
