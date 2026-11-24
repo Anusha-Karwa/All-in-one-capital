@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { resolveAppEnv } from "@/lib/appEnv";
 import { isPublicPath } from "@/lib/publicPaths";
 
 /**
@@ -6,7 +7,7 @@ import { isPublicPath } from "@/lib/publicPaths";
  * BLOCKED in prod — applicant data must never be served unauthenticated. Dev/test stay open locally.
  */
 export function middleware(req: NextRequest) {
-  if (process.env.APP_ENV !== "prod") return NextResponse.next();
+  if (resolveAppEnv() !== "prod") return NextResponse.next();
   if (isPublicPath(req.nextUrl.pathname, req.method)) return NextResponse.next();
   return new NextResponse("Staff pages are disabled until sign-in is configured.", { status: 503 });
 }

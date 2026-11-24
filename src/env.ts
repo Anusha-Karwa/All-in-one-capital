@@ -5,6 +5,7 @@
  * call `requireEnv([...])` at the point of use to fail loudly and specifically.
  */
 import { z } from "zod";
+import { resolveAppEnv } from "@/lib/appEnv";
 
 const bool = z.enum(["true", "false", "1", "0"]).transform((v) => v === "true" || v === "1");
 const int = (d: number) => z.coerce.number().int().positive().default(d);
@@ -83,7 +84,11 @@ export type Env = z.infer<typeof envSchema>;
 
 export function parseEnv(source: Record<string, string | undefined> = process.env): Env {
   // Treat empty strings (common in .env files) as unset.
-  const cleaned = Object.fromEntries(Object.entries(source).filter(([, v]) => v !== undefined && v !== ""));
+  const cleaned: Record<string, string | undefined> = Object.fromEntries(
+    Object.entries(source).filter(([, v]) => v !== undefined && v !== ""),
+  );
+  const appEnv = resolveAppEnv(cleaned);
+  if (appEnv) cleaned.APP_ENV = appEnv;
   const parsed = envSchema.safeParse(cleaned);
   if (!parsed.success) {
     const issues = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
