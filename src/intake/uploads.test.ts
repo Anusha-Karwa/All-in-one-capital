@@ -1,7 +1,7 @@
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { handleUpload } from "@vercel/blob/client";
+import { handleUpload, handleUploadPresigned } from "@vercel/blob/client";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "@/db/client";
 import { freshTestDb } from "@/db/migrate-local";
@@ -9,7 +9,13 @@ import { applications, documents } from "@/db/schema";
 import { makePdf } from "../../tests/makePdf";
 import { handleSubmission, type SubmissionDeps } from "./handleSubmission";
 import { localStorageAt } from "./storage";
-import { incomingPathFor, type IncomingStore, kindOfIncomingPath, uploadTokenOptions } from "./uploads";
+import {
+  incomingPathFor,
+  type IncomingStore,
+  kindOfIncomingPath,
+  presignedUploadOptions,
+  uploadTokenOptions,
+} from "./uploads";
 
 describe("upload path rules", () => {
   it.each([
@@ -53,6 +59,57 @@ describe("upload path rules", () => {
     expect(ok.type).toBe("blob.generate-client-token");
     expect((ok as { clientToken: string }).clientToken).toMatch(/^vercel_blob_client_teststore123_/);
     await expect(req("APP-2026-0001/deck.pdf")).rejects.toThrow(/incoming/);
+  });
+});
+
+describe("OIDC / presigned upload grants (D-036)", () => {
+  it("delegation and URL carry the same narrow constraints; only put is delegated", () => {
+    const o = presignedUploadOptions("incoming/form/app.pdf", 5_000);
+    expect(o.delegation).toEqual({
+      pathname: "incoming/form/app.pdf",
+      operations: ["put"],
+      validUntil: 605_000,
+      allowedContentTypes: ["application/pdf"],
+      maximumSizeInBytes: 10 * 1024 * 1024,
+    });
+    expect(o.urlOptions).toMatchObject({ addRandomSuffix: true, ttlDays: 1, maximumSizeInBytes: 10 * 1024 * 1024 });
+    expect(() => presignedUploadOptions("APP-2026-0001/deck.pdf")).toThrow();
+  });
+
+  it("Vercel handleUploadPresigned returns a presigned PUT URL for a valid path and refuses others (offline)", async () => {
+    // Stand-in for issueSignedToken's result: base64url(JSON scope).signature, scoped like the real delegation.
+    const signedFor = (scope: object) => ({
+      delegationToken: `${Buffer.from(JSON.stringify(scope)).toString("base64url")}.sig`,
+      clientSigningToken: "c2lnbmluZy1rZXk",
+      validUntil: Date.now() + 600_000,
+    });
+    const run = (pathname: string) =>
+      handleUploadPresigned({
+        webhookPublicKey: "test-public-key",
+        request: new Request("http://localhost/api/uploads", { method: "POST" }),
+        body: {
+          type: "blob.generate-presigned-url",
+          payload: { pathname, clientPayload: null, multipart: false, access: "private" },
+        } as never,
+        getSignedToken: async (p) => {
+          const o = presignedUploadOptions(p);
+          return { token: signedFor({ ...o.delegation, storeId: "teststore123" }), urlOptions: o.urlOptions };
+        },
+      });
+    const ok = await run("incoming/deck/pitch.pdf");
+    expect(ok.type).toBe("blob.generate-presigned-url");
+    const grant = (
+      ok as unknown as { presignedUrlPayload: { delegationToken: string; params: Record<string, string> } }
+    ).presignedUrlPayload;
+    expect(grant.params).toEqual({
+      "vercel-blob-allowed-content-types": "application/pdf",
+      "vercel-blob-maximum-size-in-bytes": String(20 * 1024 * 1024),
+      "vercel-blob-add-random-suffix": "true",
+      "vercel-blob-ttl-days": "1",
+    });
+    const scope = JSON.parse(Buffer.from(grant.delegationToken.split(".")[0], "base64url").toString());
+    expect(scope).toMatchObject({ pathname: "incoming/deck/pitch.pdf", operations: ["put"] });
+    await expect(run("APP-2026-0001/deck.pdf")).rejects.toThrow(/incoming/);
   });
 });
 

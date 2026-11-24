@@ -22,11 +22,24 @@ export function localStorageAt(root = path.join(process.cwd(), ".uploads")): Doc
   };
 }
 
-export function blobStorage(token: string): DocStorage {
+/**
+ * How this deployment authenticates to Vercel Blob (DECISIONS D-036):
+ *  - "token": BLOB_READ_WRITE_TOKEN (older stores)
+ *  - "oidc":  BLOB_STORE_ID + the Vercel runtime's OIDC token (stores connected via the Storage tab today)
+ */
+export type BlobMode = "token" | "oidc";
+export function blobMode(): BlobMode | null {
+  if (env().BLOB_READ_WRITE_TOKEN) return "token";
+  if (env().BLOB_STORE_ID) return "oidc";
+  return null;
+}
+
+/** Private Vercel Blob. `token` undefined → the SDK uses OIDC (VERCEL_OIDC_TOKEN + BLOB_STORE_ID). */
+export function blobStorage(token?: string): DocStorage {
   return {
     async put(key, bytes) {
       const { put } = await import("@vercel/blob");
-      // Decks are confidential: private store access only, read back server-side with the token.
+      // Decks are confidential: private store access only, read back server-side.
       const r = await put(key, Buffer.from(bytes), {
         access: "private",
         token,
@@ -45,8 +58,10 @@ export function blobStorage(token: string): DocStorage {
 }
 
 export function defaultStorage(): DocStorage {
-  const t = env().BLOB_READ_WRITE_TOKEN;
-  if (t) return blobStorage(t);
-  if (env().APP_ENV === "prod") throw new Error("BLOB_READ_WRITE_TOKEN is required in prod");
+  const mode = blobMode();
+  if (mode === "token") return blobStorage(env().BLOB_READ_WRITE_TOKEN);
+  if (mode === "oidc") return blobStorage();
+  if (env().APP_ENV === "prod")
+    throw new Error("Blob storage is required in prod (BLOB_STORE_ID or BLOB_READ_WRITE_TOKEN)");
   return localStorageAt();
 }

@@ -1,10 +1,16 @@
-import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
+import {
+  handleUpload,
+  handleUploadPresigned,
+  type HandleUploadBody,
+  type HandleUploadPresignedBody,
+} from "@vercel/blob/client";
 import { NextResponse } from "next/server";
 import { env, MissingEnvError } from "@/env";
 import { clientKey } from "@/lib/clientKey";
 import { logger } from "@/lib/logger";
 import { hitRateLimit } from "@/intake/rateLimit";
-import { uploadTokenOptions } from "@/intake/uploads";
+import { blobMode } from "@/intake/storage";
+import { presignedUploadOptions, uploadTokenOptions } from "@/intake/uploads";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -13,31 +19,47 @@ export const runtime = "nodejs";
 const UPLOAD_RATE = { limit: 12, windowMs: 60_000 };
 
 /**
- * Issues short-lived client tokens so the browser can upload PDFs straight to private Blob storage,
- * bypassing the serverless request-size limit. The token only allows: PDF, ≤ size limit, incoming/ path,
- * random suffix, 10-minute validity, 1-day TTL.
+ * Lets the browser upload PDFs straight to private Blob storage (bypassing the serverless body limit).
+ * Every grant is limited to: PDF, ≤ size limit, an incoming/{deck,form}/ path, random suffix, 10-minute validity,
+ * 1-day TTL. Two modes (D-036):
+ *  - "oidc"  (Storage-tab stores): signed delegation via issueSignedToken → presigned PUT URL
+ *  - "token" (BLOB_READ_WRITE_TOKEN): client token via handleUpload
  */
 export async function POST(req: Request) {
-  const token = env().BLOB_READ_WRITE_TOKEN;
-  if (!token) return NextResponse.json({ error: "Direct uploads are not configured." }, { status: 503 });
+  const mode = blobMode();
+  if (!mode) return NextResponse.json({ error: "Direct uploads are not configured." }, { status: 503 });
   try {
     const { db } = await import("@/db/client");
     const rl = await hitRateLimit(await db(), `upload:${clientKey(req)}`, UPLOAD_RATE.limit, UPLOAD_RATE.windowMs);
     if (!rl.allowed) return NextResponse.json({ error: "Too many uploads — try again in a minute." }, { status: 429 });
 
-    const body = (await req.json()) as HandleUploadBody;
+    const body = await req.json();
+    if (mode === "oidc") {
+      const { issueSignedToken } = await import("@vercel/blob");
+      const result = await handleUploadPresigned({
+        request: req,
+        body: body as HandleUploadPresignedBody,
+        // Required by the SDK even without completion callbacks; Vercel sets it when the store is connected.
+        webhookPublicKey: env().BLOB_WEBHOOK_PUBLIC_KEY,
+        getSignedToken: async (pathname) => {
+          const o = presignedUploadOptions(pathname);
+          return { token: await issueSignedToken(o.delegation), urlOptions: o.urlOptions };
+        },
+        // No onUploadCompleted: the submission itself re-fetches and validates each file.
+      });
+      return NextResponse.json(result);
+    }
     const result = await handleUpload({
-      token,
+      token: env().BLOB_READ_WRITE_TOKEN,
       request: req,
-      body,
+      body: body as HandleUploadBody,
       onBeforeGenerateToken: async (pathname) => uploadTokenOptions(pathname),
-      // No onUploadCompleted: the submission itself re-fetches and validates each file.
     });
     return NextResponse.json(result);
   } catch (e) {
     if (e instanceof MissingEnvError)
       return NextResponse.json({ error: "Uploads are not configured yet." }, { status: 503 });
-    logger.warn({ err: (e as Error).message }, "upload token refused");
+    logger.warn({ err: (e as Error).message }, "upload grant refused");
     return NextResponse.json({ error: (e as Error).message.slice(0, 200) }, { status: 400 });
   }
 }

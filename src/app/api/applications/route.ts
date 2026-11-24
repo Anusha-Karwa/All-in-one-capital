@@ -4,7 +4,7 @@ import { clientKey } from "@/lib/clientKey";
 import { logger } from "@/lib/logger";
 import { handleSubmission } from "@/intake/handleSubmission";
 import { noopQueue } from "@/intake/queue";
-import { defaultStorage } from "@/intake/storage";
+import { blobMode, defaultStorage } from "@/intake/storage";
 import { blobIncomingStore } from "@/intake/uploads";
 
 export const dynamic = "force-dynamic";
@@ -18,11 +18,11 @@ export const maxDuration = 60; // re-fetching two 20 MB PDFs from Blob and stori
 export async function POST(req: Request) {
   try {
     const { db } = await import("@/db/client");
-    const token = env().BLOB_READ_WRITE_TOKEN;
+    const mode = blobMode();
     const r = await handleSubmission(await db(), req, clientKey(req), {
       storage: defaultStorage(),
       queue: noopQueue,
-      incoming: token ? blobIncomingStore(token) : undefined,
+      incoming: mode ? blobIncomingStore(mode === "token" ? env().BLOB_READ_WRITE_TOKEN : undefined) : undefined,
     });
     return NextResponse.json(r.body, { status: r.status, headers: r.headers });
   } catch (e) {
