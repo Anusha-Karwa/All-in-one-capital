@@ -20,7 +20,8 @@
     "prices:set": "tsx scripts/set-price.ts",
     "prompts:sync": "tsx scripts/sync-prompts.ts",
     "seed:apps": "tsx scripts/seed-applications.ts",
-    "reconcile": "tsx scripts/reconcile.ts"
+    "reconcile": "tsx scripts/reconcile.ts",
+    "vercel-build": "tsx scripts/migrate-deploy.ts && next build"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.1",
