@@ -50,7 +50,29 @@ export interface IncomingStore {
   del(pathnames: string[]): Promise<void>;
 }
 
-export function blobIncomingStore(token: string): IncomingStore {
+/** Constraints for the OIDC/presigned flow: the signed delegation + the presigned PUT URL both carry them. */
+export function presignedUploadOptions(pathname: string, now = Date.now()) {
+  const o = uploadTokenOptions(pathname, now); // throws for anything outside incoming/{deck,form}/*.pdf
+  return {
+    delegation: {
+      pathname,
+      operations: ["put"] as "put"[],
+      validUntil: o.validUntil,
+      allowedContentTypes: o.allowedContentTypes,
+      maximumSizeInBytes: o.maximumSizeInBytes,
+    },
+    urlOptions: {
+      validUntil: o.validUntil,
+      allowedContentTypes: o.allowedContentTypes,
+      maximumSizeInBytes: o.maximumSizeInBytes,
+      addRandomSuffix: o.addRandomSuffix,
+      ttlDays: o.ttlDays,
+    },
+  };
+}
+
+/** `token` undefined → OIDC (BLOB_STORE_ID + Vercel runtime token). */
+export function blobIncomingStore(token?: string): IncomingStore {
   return {
     async get(pathname, maxBytes) {
       const { get } = await import("@vercel/blob");

@@ -33,7 +33,9 @@ export const envSchema = z.object({
 
   INNGEST_EVENT_KEY: opt,
   INNGEST_SIGNING_KEY: opt,
-  BLOB_READ_WRITE_TOKEN: opt,
+  BLOB_READ_WRITE_TOKEN: opt, // legacy Blob auth (token mode)
+  BLOB_STORE_ID: opt, // OIDC Blob auth (set by Vercel when a store is connected); token comes from the Vercel runtime
+  BLOB_WEBHOOK_PUBLIC_KEY: opt, // set by Vercel with OIDC stores; only needed for upload-completed callbacks (unused)
 
   AUTH_SECRET: opt,
   GOOGLE_CLIENT_ID: opt,

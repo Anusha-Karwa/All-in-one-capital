@@ -1,6 +1,6 @@
 "use client";
 
-import { upload } from "@vercel/blob/client";
+import { upload, uploadPresigned } from "@vercel/blob/client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -39,10 +39,10 @@ const field = "flex flex-col gap-1 text-sm";
 const select = "h-9 rounded-md border bg-background px-3 text-sm";
 
 /**
- * `directUpload` (prod, Blob configured): PDFs go browser → private Vercel Blob, then a small JSON submit —
+ * `uploadMode` presigned/token (Blob configured): PDFs go browser → private Vercel Blob, then a small JSON submit —
  * this avoids the serverless request-size limit. Otherwise (local dev): one multipart POST.
  */
-export function ApplyForm({ directUpload }: { directUpload: boolean }) {
+export function ApplyForm({ uploadMode }: { uploadMode: "presigned" | "token" | "multipart" }) {
   const router = useRouter();
   const [progress, setProgress] = useState<string | null>(null);
   const [founders, setFounders] = useState<Founder[]>([blankFounder()]);
@@ -80,10 +80,11 @@ export function ApplyForm({ directUpload }: { directUpload: boolean }) {
     }
     try {
       let res: Response;
-      if (directUpload) {
+      if (uploadMode !== "multipart") {
+        const send = uploadMode === "presigned" ? uploadPresigned : upload;
         const files = [];
         for (const p of picked) {
-          const blob = await upload(incomingPathFor(p.kind, p.file.name), p.file, {
+          const blob = await send(incomingPathFor(p.kind, p.file.name), p.file, {
             access: "private",
             handleUploadUrl: "/api/uploads",
             contentType: "application/pdf",
