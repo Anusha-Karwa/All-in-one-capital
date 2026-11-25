@@ -3,7 +3,7 @@ import { env, MissingEnvError } from "@/env";
 import { clientKey } from "@/lib/clientKey";
 import { logger } from "@/lib/logger";
 import { handleSubmission } from "@/intake/handleSubmission";
-import { noopQueue } from "@/intake/queue";
+import { defaultQueue } from "@/intake/queue";
 import { blobMode, defaultStorage } from "@/intake/storage";
 import { blobIncomingStore } from "@/intake/uploads";
 
@@ -21,7 +21,7 @@ export async function POST(req: Request) {
     const mode = blobMode();
     const r = await handleSubmission(await db(), req, clientKey(req), {
       storage: defaultStorage(),
-      queue: noopQueue,
+      queue: await defaultQueue(),
       incoming: mode ? blobIncomingStore(mode === "token" ? env().BLOB_READ_WRITE_TOKEN : undefined) : undefined,
     });
     return NextResponse.json(r.body, { status: r.status, headers: r.headers });

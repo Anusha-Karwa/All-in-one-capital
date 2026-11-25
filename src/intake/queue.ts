@@ -15,3 +15,22 @@ export const noopQueue: ScreeningQueue = {
     return { enqueued: false };
   },
 };
+
+/** Inngest-backed queue. Event id = applicationId, so a duplicate send can't start a second run. */
+export function inngestQueue(
+  send: (p: { name: string; data: { applicationId: string }; id: string }) => Promise<unknown>,
+): ScreeningQueue {
+  return {
+    async enqueue(applicationId) {
+      await send({ name: "application/received", data: { applicationId }, id: `screen-${applicationId}` });
+      return { enqueued: true };
+    },
+  };
+}
+
+export async function defaultQueue(): Promise<ScreeningQueue> {
+  const { env } = await import("@/env");
+  if (!env().INNGEST_EVENT_KEY) return noopQueue;
+  const { inngest } = await import("@/inngest/client");
+  return inngestQueue((p) => inngest.send(p));
+}

@@ -21,7 +21,8 @@ async function main() {
   const d = await scriptDb();
   const { submitApplication } = await import("@/intake/submit");
   const { defaultStorage } = await import("@/intake/storage");
-  const { noopQueue } = await import("@/intake/queue");
+  const { defaultQueue } = await import("@/intake/queue");
+  const queue = await defaultQueue();
   const { validateFiles } = await import("@/intake/schema");
   const rows = [];
   for (const company of companies.sort()) {
@@ -41,7 +42,7 @@ async function main() {
       { companyName: `${company}${suffix}` },
       inc,
       { source: "seed", isTest, actor: "script:seed-applications" },
-      { storage: defaultStorage(), queue: noopQueue },
+      { storage: defaultStorage(), queue },
     );
     rows.push({
       company,
