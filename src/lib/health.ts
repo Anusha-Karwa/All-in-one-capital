@@ -48,7 +48,10 @@ export async function buildHealthReport(e: Env, probes: { db?: Probe }): Promise
       : probes.db
         ? await timed(probes.db)
         : { status: "configured_unprobed" },
-    portkey: presence(e, ["PORTKEY_API_KEY", "PORTKEY_VIRTUAL_KEY_GEMINI"], "Phase 1"),
+    portkey:
+      e.PORTKEY_API_KEY && e.PORTKEY_VIRTUAL_KEY_GEMINI
+        ? { status: "configured_unprobed", detail: "hosted Portkey" }
+        : presence(e, ["PORTKEY_GATEWAY_URL", "PORTKEY_GATEWAY_SECRET", "GEMINI_API_KEY"], "self-hosted gateway"),
     gemini: presence(
       e,
       ["GEMINI_API_KEY", "GEMINI_MODEL_FAST", "GEMINI_MODEL_SMART", "GEMINI_EMBEDDING_MODEL"],
