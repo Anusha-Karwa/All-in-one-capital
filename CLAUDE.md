@@ -11,7 +11,8 @@ Gemini via **Portkey** · **Langfuse** tracing · **Inngest** queue · LangGraph
 ```
 src/app          routes, pages, API routes (src/app/api/*)
 src/db           schema.ts (all tables), client.ts (lazy Drizzle client)
-src/ai           THE LLM wrapper (call.ts), portkey, langfuse, cost
+src/ai           THE LLM wrapper (call.ts), transport (Portkey OSS gateway in-process / hosted), langfuse, cost
+gateway/         vendor.sh + README: Portkey's open-source gateway, vendored at build (gateway/vendor is git-ignored)
 src/prompts      versioned prompts <name>.v<N>.md
 src/research     evidenceMap.ts, loop.ts, numericChecks.ts, tools/*
 src/scoring      retrieval, scoring, citation validator
@@ -33,6 +34,7 @@ seed/            case PDFs (git-ignored)
 - `npm run dev` · `npm run build`
 - `npm run typecheck` · `npm run lint` · `npm test`
 - `npm run kb:import` (memos+notes+rules from /seed; `-- --no-embed` to skip embeddings) · `npm run prices:set -- <model> <in> <out>` · `npm run prompts:sync`
+- `npm run gateway:vendor` (once locally: downloads Portkey's OSS gateway v1.15.2 into gateway/vendor; Vercel does it in `vercel-build`)
 - `npm run seed:apps` (10 seed applications; `-- --test --suffix=-x` for is_test copies) · `npm run reconcile` (stuck-job sweep)
 - Local DB without Neon: `DATABASE_URL_DEV=pglite://./.pglite` (migrations auto-applied by scripts)
 - `npm run db:generate` (after editing schema.ts) · `npm run db:verify` (apply migrations to in-memory PG+pgvector) · `npm run db:migrate` (dev branch) · `npm run db:migrate:prod` (prod — explicit only)
