@@ -23,6 +23,8 @@ const eslintConfig = [
             { name: "portkey-ai", message: "Use callModel/embed from @/ai/call." },
             { name: "@google/genai", message: "Use callModel/embed from @/ai/call." },
             { name: "langfuse", message: "Use the tracer in @/ai." },
+            { name: "@langfuse/tracing", message: "Use the tracer in @/ai." },
+            { name: "@langfuse/otel", message: "Use the tracer in @/ai." },
           ],
         },
       ],

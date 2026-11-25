@@ -3,7 +3,7 @@
  * Proves Case 04 Task 3 ("every model call through Portkey, automatic retries switched on") and the §8.4 retry rows.
  */
 import { existsSync } from "node:fs";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const VENDORED = existsSync("gateway/vendor/src/index.ts");
 const realFetch = globalThis.fetch;
@@ -17,10 +17,23 @@ const googleChat = (text: string) =>
     modelVersion: "gemini-3.7-flash",
   });
 
+type TransportMod = typeof import("./transport");
+type CallMod = typeof import("./call");
+let transport: TransportMod;
+let call: CallMod;
+
+// Load Portkey's gateway source ONCE (cold transform is slow under a parallel test run), with the env it needs.
+beforeAll(async () => {
+  if (!VENDORED) return;
+  vi.stubEnv("GEMINI_API_KEY", "test-gemini-key");
+  transport = await import("./transport");
+  call = await import("./call");
+  await import("@portkey-gateway");
+}, 120_000);
+
 beforeEach(() => {
   googleCalls = [];
   script = [];
-  vi.stubEnv("GEMINI_API_KEY", "test-gemini-key");
   vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     if (!url.includes("generativelanguage.googleapis.com")) return realFetch(input, init);
@@ -36,14 +49,12 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.unstubAllGlobals();
-  vi.unstubAllEnvs();
-  vi.resetModules();
 });
 
 describe.skipIf(!VENDORED)("Portkey OSS gateway, in-process (run `npm run gateway:vendor` first)", () => {
   it("routes a chat call through the gateway to Google with the key, and bills reasoning tokens", async () => {
     script = [googleChat('{"ok":true}')];
-    const { portkeyTransport } = await import("./transport");
+    const { portkeyTransport } = transport;
     const r = await portkeyTransport().chat(
       { model: "gemini-3.7-flash", messages: [{ role: "user", content: "hi" }], json: true },
       { step: "t", promptRef: "t@v1" },
@@ -65,7 +76,7 @@ describe.skipIf(!VENDORED)("Portkey OSS gateway, in-process (run `npm run gatewa
         }),
       googleChat("recovered"),
     ];
-    const { portkeyTransport } = await import("./transport");
+    const { portkeyTransport } = transport;
     const r = await portkeyTransport().chat(
       { model: "gemini-3.7-flash", messages: [{ role: "user", content: "hi" }], json: false },
       { step: "t", promptRef: "t@v1" },
@@ -82,8 +93,8 @@ describe.skipIf(!VENDORED)("Portkey OSS gateway, in-process (run `npm run gatewa
           status: 400,
         }),
     ];
-    const { portkeyTransport } = await import("./transport");
-    const { errorTypeOf } = await import("./call");
+    const { portkeyTransport } = transport;
+    const { errorTypeOf } = call;
     const err = await portkeyTransport()
       .chat(
         { model: "gemini-3.7-flash", messages: [{ role: "user", content: "hi" }], json: false },
@@ -98,7 +109,7 @@ describe.skipIf(!VENDORED)("Portkey OSS gateway, in-process (run `npm run gatewa
   it("embeddings: one Google call per text, vectors truncated + normalised to 768", async () => {
     const values = (seed: number) => Array.from({ length: 3072 }, (_, i) => Math.sin(i * seed + 1));
     script = [Response.json({ embedding: { values: values(1) } }), Response.json({ embedding: { values: values(2) } })];
-    const { portkeyTransport } = await import("./transport");
+    const { portkeyTransport } = transport;
     const r = await portkeyTransport().embed(
       { model: "gemini-embedding-001", input: ["a b c d", "e f g h"], dimensions: 768 },
       { step: "t", promptRef: "embed@v1" },
