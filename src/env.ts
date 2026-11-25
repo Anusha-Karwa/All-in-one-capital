@@ -26,8 +26,6 @@ export const envSchema = z.object({
   PORTKEY_API_KEY: opt,
   PORTKEY_VIRTUAL_KEY_GEMINI: opt,
   PORTKEY_CONFIG_ID: opt,
-  PORTKEY_GATEWAY_URL: z.string().url().optional(), // self-hosted Portkey OSS gateway (D-037)
-  PORTKEY_GATEWAY_SECRET: opt, // shared secret the self-hosted gateway requires
 
   LANGFUSE_PUBLIC_KEY: opt,
   LANGFUSE_SECRET_KEY: opt,

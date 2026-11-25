@@ -21,7 +21,8 @@
     "prompts:sync": "tsx scripts/sync-prompts.ts",
     "seed:apps": "tsx scripts/seed-applications.ts",
     "reconcile": "tsx scripts/reconcile.ts",
-    "vercel-build": "tsx scripts/migrate-deploy.ts && next build"
+    "vercel-build": "bash gateway/vendor.sh && tsx scripts/migrate-deploy.ts && next build",
+    "gateway:vendor": "bash gateway/vendor.sh"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.1",

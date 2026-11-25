@@ -1,27 +1,25 @@
 import { Portkey } from "portkey-ai";
 import { env, MissingEnvError } from "@/env";
+import { DEFAULT_PORTKEY_CONFIG } from "./portkeyConfig";
+import { gatewayPost } from "./portkeyInProcess";
 import type { ChatResult, EmbedResult, Transport } from "./types";
+
+export { DEFAULT_PORTKEY_CONFIG };
 
 /**
  * Portkey transport — every model call goes through a Portkey gateway (§9.1, Case 04 Task 3).
  *
- * Two modes (DECISIONS D-037):
- *  - self-hosted: Portkey's open-source gateway deployed in our Vercel team (`gateway/`), reached at
- *    PORTKEY_GATEWAY_URL with a shared secret; the Gemini key travels per request. Used because Portkey's
- *    hosted sign-ups are closed.
- *  - hosted: app.portkey.ai with PORTKEY_API_KEY + PORTKEY_VIRTUAL_KEY_GEMINI (switch by setting those).
- * Both: retry 4× with exponential backoff on 429/5xx, done by the gateway (not by us).
+ * Modes (DECISIONS D-037, D-042):
+ *  - in_process (default): Portkey's open-source gateway (MIT, pinned v1.15.2, `gateway/`) runs inside this app;
+ *    requests are handed to it in memory and it calls Gemini with retries. Used because hosted sign-ups are closed.
+ *  - hosted: app.portkey.ai via the `portkey-ai` SDK, when PORTKEY_API_KEY + PORTKEY_VIRTUAL_KEY_GEMINI are set.
+ * Both: retry 4× with exponential backoff on 429/5xx, performed by the gateway (not by us).
  */
-export const DEFAULT_PORTKEY_CONFIG = {
-  retry: { attempts: 4, on_status_codes: [429, 500, 502, 503, 504] },
-  request_timeout: 90_000,
-} as const;
-
-export type GatewayMode = "self_hosted" | "hosted";
+export type GatewayMode = "in_process" | "hosted";
 
 export function gatewayMode(e = env()): GatewayMode | null {
   if (e.PORTKEY_API_KEY && e.PORTKEY_VIRTUAL_KEY_GEMINI) return "hosted";
-  if (e.PORTKEY_GATEWAY_URL && e.PORTKEY_GATEWAY_SECRET && e.GEMINI_API_KEY) return "self_hosted";
+  if (e.GEMINI_API_KEY) return "in_process";
   return null;
 }
 
@@ -87,79 +85,97 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (t: T, i: number) =
   return out;
 }
 
+interface ChatResponse {
+  choices?: { message?: { content?: string | null } }[];
+  model?: string;
+  usage?: ChatUsage;
+}
+interface EmbedResponse {
+  data?: { embedding: number[] }[];
+  model?: string;
+  usage?: { prompt_tokens?: number };
+}
+type Sent<T> = { json: T; headers: HeaderMap };
+
 export function portkeyTransport(): Transport {
   const e = env();
   const mode = gatewayMode(e);
   if (!mode)
     throw new MissingEnvError([
-      "PORTKEY_GATEWAY_URL + PORTKEY_GATEWAY_SECRET + GEMINI_API_KEY (self-hosted) or PORTKEY_API_KEY + PORTKEY_VIRTUAL_KEY_GEMINI (hosted)",
+      "GEMINI_API_KEY (in-process Portkey gateway) or PORTKEY_API_KEY + PORTKEY_VIRTUAL_KEY_GEMINI (hosted)",
     ]);
+  const provider = mode === "in_process" ? "portkey-oss:google" : "portkey:google";
 
-  const client = (traceID?: string, metadata?: Record<string, string>) =>
-    mode === "hosted"
-      ? new Portkey({
-          apiKey: e.PORTKEY_API_KEY,
-          virtualKey: e.PORTKEY_VIRTUAL_KEY_GEMINI,
-          config: e.PORTKEY_CONFIG_ID ?? DEFAULT_PORTKEY_CONFIG,
-          traceID,
-          metadata,
-        })
-      : new Portkey({
-          baseURL: `${e.PORTKEY_GATEWAY_URL!.replace(/\/+$/, "")}/v1`,
-          provider: "google",
-          Authorization: `Bearer ${e.GEMINI_API_KEY}`,
-          config: DEFAULT_PORTKEY_CONFIG,
-          traceID,
-          metadata,
-        });
-  const opts = mode === "self_hosted" ? { extraHeaders: { "x-gateway-secret": e.PORTKEY_GATEWAY_SECRET! } } : undefined;
-  const provider = mode === "self_hosted" ? "portkey-oss:google" : "portkey:google";
-  const headersOf = (res: unknown) => (res as { getHeaders?: () => HeaderMap }).getHeaders?.();
+  /** One request through whichever gateway is configured. */
+  async function send<T>(
+    kind: "chat" | "embed",
+    body: Record<string, unknown>,
+    traceId?: string,
+    metadata?: Record<string, string>,
+  ): Promise<Sent<T>> {
+    if (mode === "in_process") {
+      const r = await gatewayPost<T>({
+        path: kind === "chat" ? "/v1/chat/completions" : "/v1/embeddings",
+        body,
+        geminiKey: e.GEMINI_API_KEY!,
+        traceId,
+        metadata,
+      });
+      return { json: r.json, headers: r.headers };
+    }
+    const pk = new Portkey({
+      apiKey: e.PORTKEY_API_KEY,
+      virtualKey: e.PORTKEY_VIRTUAL_KEY_GEMINI,
+      config: e.PORTKEY_CONFIG_ID ?? DEFAULT_PORTKEY_CONFIG,
+      traceID: traceId,
+      metadata,
+    });
+    const res =
+      kind === "chat" ? await pk.chat.completions.create(body as never) : await pk.embeddings.create(body as never);
+    return { json: res as unknown as T, headers: (res as unknown as { getHeaders?: () => HeaderMap }).getHeaders?.() };
+  }
 
   return {
     async chat(req, meta): Promise<ChatResult> {
-      const pk = client(meta.traceId, { step: meta.step, prompt: meta.promptRef, app: meta.applicationId ?? "" });
-      const res = await pk.chat.completions.create(
+      const { json, headers } = await send<ChatResponse>(
+        "chat",
         {
           model: req.model,
           messages: req.messages,
           temperature: req.temperature ?? 0,
-          ...(req.json ? { response_format: { type: "json_object" as const } } : {}),
+          ...(req.json ? { response_format: { type: "json_object" } } : {}),
         },
-        undefined,
-        opts,
+        meta.traceId,
+        { step: meta.step, prompt: meta.promptRef, app: meta.applicationId ?? "" },
       );
-      const h = headersOf(res);
       return {
-        text: String(res.choices?.[0]?.message?.content ?? ""),
-        usage: billableUsage(res.usage as ChatUsage | undefined),
+        text: String(json.choices?.[0]?.message?.content ?? ""),
+        usage: billableUsage(json.usage),
         provider,
-        servedModel: String(res.model ?? req.model),
-        portkeyRequestId: portkeyHeader(h, "request-id") ?? (portkeyHeader(h, "trace-id") || undefined),
-        retryCount: Number(portkeyHeader(h, "retry-attempt-count") ?? 0),
+        servedModel: String(json.model ?? req.model),
+        portkeyRequestId: portkeyHeader(headers, "request-id") ?? (portkeyHeader(headers, "trace-id") || undefined),
+        retryCount: Number(portkeyHeader(headers, "retry-attempt-count") ?? 0),
       };
     },
     async embed(req, meta): Promise<EmbedResult> {
-      const pk = client(meta.traceId, { step: meta.step, prompt: meta.promptRef, app: meta.applicationId ?? "" });
       // One text per request: the gateway's Google mapping merges an input array into ONE embedding.
       const results = await mapLimit(req.input, 4, async (text) => {
-        const res = await pk.embeddings.create(
-          { model: req.model, input: text, dimensions: req.dimensions } as never,
-          undefined,
-          opts as never,
+        const { json, headers } = await send<EmbedResponse>(
+          "embed",
+          { model: req.model, input: text, dimensions: req.dimensions },
+          meta.traceId,
+          {
+            step: meta.step,
+            prompt: meta.promptRef,
+          },
         );
-        const r = res as unknown as {
-          data: { embedding: number[] }[];
-          model?: string;
-          usage?: { prompt_tokens?: number };
-        };
-        if (r.data?.length !== 1) throw new Error(`expected 1 embedding, got ${r.data?.length ?? 0}`);
-        const reported = r.usage?.prompt_tokens ?? -1;
+        if (json.data?.length !== 1) throw new Error(`expected 1 embedding, got ${json.data?.length ?? 0}`);
+        const reported = json.usage?.prompt_tokens ?? -1;
         return {
-          vector: truncateNormalize(r.data[0].embedding, req.dimensions),
+          vector: truncateNormalize(json.data[0].embedding, req.dimensions),
           tokens: reported > 0 ? reported : estimateTokens(text),
-          model: r.model,
-          h: headersOf(res),
+          model: json.model,
+          headers,
         };
       });
       return {
@@ -167,8 +183,8 @@ export function portkeyTransport(): Transport {
         usage: { inputTokens: results.reduce((s, x) => s + x.tokens, 0), outputTokens: 0, cachedTokens: 0 },
         provider,
         servedModel: String(results[0]?.model ?? req.model),
-        portkeyRequestId: portkeyHeader(results[0]?.h, "request-id"),
-        retryCount: results.reduce((s, x) => s + Number(portkeyHeader(x.h, "retry-attempt-count") ?? 0), 0),
+        portkeyRequestId: portkeyHeader(results[0]?.headers, "request-id"),
+        retryCount: results.reduce((s, x) => s + Number(portkeyHeader(x.headers, "retry-attempt-count") ?? 0), 0),
       };
     },
   };

@@ -46,10 +46,11 @@ describe("transport helpers", () => {
     expect(estimateTokens("")).toBe(1);
   });
 
-  it("chooses hosted when hosted keys exist, else self-hosted, else none", () => {
-    const self = { PORTKEY_GATEWAY_URL: "https://gw.example.com", PORTKEY_GATEWAY_SECRET: "s", GEMINI_API_KEY: "k" };
-    expect(gatewayMode(parseEnv(self))).toBe("self_hosted");
-    expect(gatewayMode(parseEnv({ ...self, PORTKEY_API_KEY: "p", PORTKEY_VIRTUAL_KEY_GEMINI: "v" }))).toBe("hosted");
-    expect(gatewayMode(parseEnv({ PORTKEY_GATEWAY_URL: "https://gw.example.com" }))).toBeNull();
+  it("uses hosted Portkey when its keys exist, else the in-process OSS gateway, else nothing", () => {
+    expect(gatewayMode(parseEnv({ GEMINI_API_KEY: "k" }))).toBe("in_process");
+    expect(gatewayMode(parseEnv({ GEMINI_API_KEY: "k", PORTKEY_API_KEY: "p", PORTKEY_VIRTUAL_KEY_GEMINI: "v" }))).toBe(
+      "hosted",
+    );
+    expect(gatewayMode(parseEnv({}))).toBeNull();
   });
 });
